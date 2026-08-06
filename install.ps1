@@ -20,27 +20,23 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 New-Item -ItemType Directory -Force -Path $docsDir | Out-Null
 New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
 
-# 2. Copy compiled binary to ~/.seppy/bin/seppy.exe
+# 2. Build Go binary and install to ~/.seppy/bin/
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourceExe = Join-Path $scriptDir "seppy.exe"
-if (!(Test-Path $sourceExe)) {
-    $sourceExe = Join-Path $scriptDir "..\seppy.exe"
-}
+$srcDir = Join-Path $scriptDir "src"
 
-if (Test-Path $sourceExe) {
-    Copy-Item -Path $sourceExe -Destination (Join-Path $binDir "seppy.exe") -Force
-    Copy-Item -Path $sourceExe -Destination (Join-Path $binDir "setup.exe") -Force
-    Write-Host "  [OK] Binary installed to $binDir" -ForegroundColor Green
+if (Test-Path (Join-Path $srcDir "main.go")) {
+    Write-Host "  Building Seppy CLI engine from Go source..." -ForegroundColor Cyan
+    Push-Location $srcDir
+    & "go" build -o (Join-Path $binDir "seppy.exe") main.go
+    Copy-Item -Path (Join-Path $binDir "seppy.exe") -Destination (Join-Path $binDir "setup.exe") -Force
+    Pop-Location
+    Write-Host "  [OK] Binary compiled and installed to $binDir" -ForegroundColor Green
 } else {
-    Write-Host "  [!] Warning: seppy.exe not found in $scriptDir. Build it first with 'go build'." -ForegroundColor Yellow
+    Write-Host "  [!] Error: src/main.go not found." -ForegroundColor Red
 }
 
 # 3. Reflect local skills & docs into ~/.seppy
 $templateDir = Join-Path $scriptDir "template"
-if (!(Test-Path $templateDir)) {
-    $templateDir = Join-Path $scriptDir "..\template"
-}
-
 if (Test-Path $templateDir) {
     $localSkills = Join-Path $templateDir ".agents\skills"
     if (Test-Path $localSkills) {
@@ -59,16 +55,8 @@ if (!(Test-Path $configFile)) {
     $defaultConfig = @'
 {
   "default_unselect_all": true,
-  "custom_skills_commands": [
-    {
-      "name": "npx skills add (Vercel Find-Skills)",
-      "command": "npx skills add https://github.com/vercel-labs/skills --skill find-skills"
-    }
-  ],
-  "custom_npm_packages": [
-    "Framer Motion (Animations)",
-    "Zustand (State Management)"
-  ]
+  "custom_skills_commands": [],
+  "custom_npm_packages": []
 }
 '@
     Set-Content -Path $configFile -Value $defaultConfig -Encoding UTF8
@@ -79,32 +67,8 @@ if (!(Test-Path $configFile)) {
 $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$binDir*") {
     [System.Environment]::SetEnvironmentVariable("Path", $userPath + ";$binDir", "User")
+    $env:Path = "$env:Path;$binDir"
     Write-Host "  [OK] Added $binDir to User PATH" -ForegroundColor Green
 }
 
-# 6. Add seppy shortcut function to PowerShell Profile
-if (!(Test-Path -Path $PROFILE)) {
-    New-Item -Type File -Path $PROFILE -Force | Out-Null
-}
-
-$profileShortcut = @'
-
-# Seppy CLI Global Shortcuts
-function seppy {
-    Start-Process -FilePath "$HOME\.seppy\bin\seppy.exe"
-    Stop-Process -Id $PID -Force
-}
-
-function setup {
-    Start-Process -FilePath "$HOME\.seppy\bin\seppy.exe"
-    Stop-Process -Id $PID -Force
-}
-'@
-
-$profileContent = Get-Content -Path $PROFILE -Raw -ErrorAction SilentlyContinue
-if ($profileContent -notlike "*seppy.exe*") {
-    Add-Content -Path $PROFILE -Value $profileShortcut
-    Write-Host "  [OK] Added 'seppy' command shortcut to PowerShell Profile ($PROFILE)" -ForegroundColor Green
-}
-
-Write-Host "`n  🎉 Seppy installation complete! Close and reopen your terminal, then type 'seppy'.`n" -ForegroundColor Cyan
+Write-Host "`n  Seppy installation complete! Reopen PowerShell or run 'seppy'.`n" -ForegroundColor Cyan

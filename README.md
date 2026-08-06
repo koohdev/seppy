@@ -6,7 +6,7 @@
     ▄▄▄▄██ ██████ ██     ██       ██         (   "   )_
 ```
 
-**Seppy** is a lightweight, high-performance Terminal User Interface (TUI) generator framework for scaffolding Next.js applications. 
+**Seppy** is a lightweight, high-performance Terminal User Interface (TUI) generator framework for scaffolding Next.js applications.
 
 Seppy is **100% dynamic and unopinionated**: it does not force opinionated templates or hardcoded files on users. Instead, `seppy.exe` acts as a clean, dynamic TUI engine that reads skills, markdown docs, and configuration files directly from **each user's personal `~/.seppy` runtime directory**.
 
@@ -28,6 +28,7 @@ Seppy is **100% dynamic and unopinionated**: it does not force opinionated templ
 ## 📋 Prerequisites
 
 Before setting up Seppy, ensure you have:
+
 1. **Windows 10/11** (PowerShell or Windows Terminal).
 2. **Node.js & npm / npx** (for running `create-next-app` and installing packages).
 3. **Go 1.21+** (only required if building from source).
@@ -44,6 +45,7 @@ cd path\to\setup
 ```
 
 The installer will automatically:
+
 - Create `~/.seppy/bin`, `~/.seppy/docs`, and `~/.seppy/cache/skills`.
 - Copy compiled `seppy.exe` into `~/.seppy/bin`.
 - Add `~/.seppy/bin` to your **User PATH**.
@@ -52,6 +54,7 @@ The installer will automatically:
 ### 2. Launch Seppy
 
 Reopen your terminal and run:
+
 ```powershell
 seppy
 ```
@@ -60,17 +63,17 @@ seppy
 
 ## 🎮 Navigation & Keyboard Shortcuts
 
-| Shortcut | Action |
-| :--- | :--- |
-| `[Enter]` | Confirm selection & proceed to next step |
-| `[ESC]` | Return to previous setup step |
-| `[Tab]` | Toggle inline **Custom Sources** tab (add custom skill commands / markdown paths) |
-| `[Ctrl+L]` | Open **System Locations** modal (configuration & directory paths) |
-| `[Space]` | Toggle checkbox selection |
-| `[A]` | Select All items in current list |
-| `[N]` | Clear All items in current list |
-| `↑` / `↓` or Mouse Wheel | Scroll up/down through lists and viewport content |
-| `[Q]` or `[Ctrl+C]` | Cancel setup and exit CLI |
+| Shortcut                 | Action                                                                            |
+| :----------------------- | :-------------------------------------------------------------------------------- |
+| `[Enter]`                | Confirm selection & proceed to next step                                          |
+| `[ESC]`                  | Return to previous setup step                                                     |
+| `[Tab]`                  | Toggle inline **Custom Sources** tab (add custom skill commands / markdown paths) |
+| `[Ctrl+L]`               | Open **System Locations** modal (configuration & directory paths)                 |
+| `[Space]`                | Toggle checkbox selection                                                         |
+| `[A]`                    | Select All items in current list                                                  |
+| `[N]`                    | Clear All items in current list                                                   |
+| `↑` / `↓` or Mouse Wheel | Scroll up/down through lists and viewport content                                 |
+| `[Q]` or `[Ctrl+C]`      | Cancel setup and exit CLI                                                         |
 
 ---
 

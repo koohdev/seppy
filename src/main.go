@@ -483,10 +483,12 @@ type model struct {
 	// ADD CUSTOM SOURCES inline section
 	customSkillInput     string
 	customDocInput       string
+	customNpmInput       string
 	customActiveField    int
 	customSkillItems     []string
 	customSkillCmds      []string
 	customDocPaths       []string
+	customNpmPackages    []string
 
 	// Viewport component for 100% full tab scrolling
 	viewport             viewport.Model
@@ -573,17 +575,9 @@ func saveUserConfig(configFile string, cfg UserConfig) {
 
 func defaultUserConfig() UserConfig {
 	return UserConfig{
-		DefaultUnselectAll: true,
-		CustomSkillsCommands: []CustomSkillCommand{
-			{
-				Name:    "npx skills add (Vercel Find-Skills)",
-				Command: "npx skills add https://github.com/vercel-labs/skills --skill find-skills",
-			},
-		},
-		CustomNpmPackages: []string{
-			"Framer Motion (Animations)",
-			"Zustand (State Management)",
-		},
+		DefaultUnselectAll:   true,
+		CustomSkillsCommands: []CustomSkillCommand{},
+		CustomNpmPackages:    []string{},
 	}
 }
 
@@ -666,11 +660,7 @@ func initialModel() model {
 		}
 	}
 
-	skills := []string{
-		"Prettier & Tailwind Canonical Classes",
-		"Lenis (Smooth Scrolling)",
-		"Lucide React (Icons)",
-	}
+	var skills []string
 	skills = append(skills, userCfg.CustomNpmPackages...)
 
 	s1 := spinner.New()
@@ -707,6 +697,7 @@ func initialModel() model {
 		customSkillItems:     customSkillItems,
 		customSkillCmds:      customSkillCmds,
 		customDocPaths:       customDocPaths,
+		customNpmPackages:    userCfg.CustomNpmPackages,
 		viewport:             vp,
 		width:                initW,
 		height:               initH,
@@ -900,7 +891,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.idleTicks = 0
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			if m.state == stateLocations {
 				m.state = m.prevState
 				if m.state == stateAddCustom {
@@ -1006,12 +997,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case stateAddCustom:
 			switch msg.String() {
 			case "tab":
+				m.customActiveField = (m.customActiveField + 1) % 3
 				if m.customActiveField == 0 {
-					m.customActiveField = 1
-					m.viewport.GotoBottom()
-				} else {
-					m.customActiveField = 0
 					m.viewport.GotoTop()
+				} else if m.customActiveField == 1 {
+					offset := 6
+					if len(m.customSkillCmds) > 0 {
+						offset += 1 + len(m.customSkillCmds)
+					}
+					m.viewport.SetYOffset(offset)
+				} else {
+					m.viewport.GotoBottom()
 				}
 				m = updateCustomViewportContent(m)
 				playToggleSound()
@@ -1053,12 +1049,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.customSkillInput = ""
 						m = updateCustomViewportContent(m)
 						playToggleSound()
-					} else if strings.TrimSpace(m.customDocInput) == "" {
+					} else if strings.TrimSpace(m.customDocInput) == "" && strings.TrimSpace(m.customNpmInput) == "" {
 						m.state = stateSkills
 						m.cursor = 0
 						playConfirmSound()
 					}
-				} else {
+				} else if m.customActiveField == 1 {
 					trimmed := strings.TrimSpace(m.customDocInput)
 					if trimmed != "" {
 						docName := filepath.Base(trimmed)
@@ -1070,7 +1066,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.customDocInput = ""
 						m = updateCustomViewportContent(m)
 						playToggleSound()
-					} else if strings.TrimSpace(m.customSkillInput) == "" {
+					} else if strings.TrimSpace(m.customSkillInput) == "" && strings.TrimSpace(m.customNpmInput) == "" {
+						m.state = stateSkills
+						m.cursor = 0
+						playConfirmSound()
+					}
+				} else {
+					trimmed := extractNpmPackageName(m.customNpmInput)
+					if trimmed != "" {
+						alreadyAdded := false
+						for _, pkg := range m.customNpmPackages {
+							if strings.EqualFold(pkg, trimmed) {
+								alreadyAdded = true
+								break
+							}
+						}
+						if !alreadyAdded {
+							m.customNpmPackages = append(m.customNpmPackages, trimmed)
+							offset := len(m.availableSkills)
+							m.availableSkills = append(m.availableSkills, trimmed)
+							m.selectedSkills[offset] = true
+
+							m.config.CustomNpmPackages = append(m.config.CustomNpmPackages, trimmed)
+							saveUserConfig(m.configPath, m.config)
+						}
+						m.customNpmInput = ""
+						m = updateCustomViewportContent(m)
+						playToggleSound()
+					} else if strings.TrimSpace(m.customSkillInput) == "" && strings.TrimSpace(m.customDocInput) == "" {
 						m.state = stateSkills
 						m.cursor = 0
 						playConfirmSound()
@@ -1085,17 +1108,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.customSkillInput = m.customSkillInput[:len(m.customSkillInput)-1]
 							m = updateCustomViewportContent(m)
 						}
-					} else {
+					} else if m.customActiveField == 1 {
 						if len(m.customDocInput) > 0 {
 							m.customDocInput = m.customDocInput[:len(m.customDocInput)-1]
+							m = updateCustomViewportContent(m)
+						}
+					} else {
+						if len(m.customNpmInput) > 0 {
+							m.customNpmInput = m.customNpmInput[:len(m.customNpmInput)-1]
 							m = updateCustomViewportContent(m)
 						}
 					}
 				case tea.KeyRunes:
 					if m.customActiveField == 0 {
 						m.customSkillInput += string(msg.Runes)
-					} else {
+					} else if m.customActiveField == 1 {
 						m.customDocInput += string(msg.Runes)
+					} else {
+						m.customNpmInput += string(msg.Runes)
 					}
 					m = updateCustomViewportContent(m)
 				}
@@ -1125,7 +1155,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				playConfirmSound()
 				return m, nil
-			case "enter", "q":
+			case "enter":
 				closeParentTerminal()
 				return m, tea.Quit
 			}
@@ -1356,6 +1386,18 @@ func extractSkillName(raw string) string {
 	return raw
 }
 
+func extractNpmPackageName(raw string) string {
+	raw = sanitizeString(raw)
+	if raw == "" {
+		return ""
+	}
+	raw = strings.TrimPrefix(raw, "npm install")
+	raw = strings.TrimPrefix(raw, "npm i")
+	raw = strings.TrimPrefix(raw, "pnpm add")
+	raw = strings.TrimPrefix(raw, "yarn add")
+	return strings.TrimSpace(raw)
+}
+
 func sanitizeSlug(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "-")
@@ -1438,6 +1480,23 @@ func updateCustomViewportContent(m model) model {
 	if len(m.customDocPaths) > 0 {
 		for _, d := range m.customDocPaths {
 			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(filepath.Base(d)) + "\n")
+		}
+	}
+
+	tabContent.WriteString("\n")
+
+	if m.customActiveField == 2 {
+		tabContent.WriteString(indent + activeItemStyle.Render("[+] Custom NPM Package Name") + "\n")
+		tabContent.WriteString(indent + instructionStyle.Render("    e.g. npm install framer-motion") + "\n")
+		tabContent.WriteString(indent + "    " + m.spinner.View() + " " + activeItemStyle.Render(m.customNpmInput) + "█\n")
+	} else {
+		tabContent.WriteString(indent + uncheckStyle.Render("[ ] Custom NPM Package Name") + "\n")
+		tabContent.WriteString(indent + instructionStyle.Render("    e.g. npm install framer-motion") + "\n")
+		tabContent.WriteString(indent + "    " + "  " + inactiveItemStyle.Render(m.customNpmInput) + "\n")
+	}
+	if len(m.customNpmPackages) > 0 {
+		for _, pkg := range m.customNpmPackages {
+			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(pkg) + "\n")
 		}
 	}
 
