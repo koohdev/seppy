@@ -27,7 +27,7 @@ $srcDir = Join-Path $scriptDir "src"
 if (Test-Path (Join-Path $srcDir "main.go")) {
     Write-Host "  Building Seppy CLI engine from Go source..." -ForegroundColor Cyan
     Push-Location $srcDir
-    & "go" build -o (Join-Path $binDir "seppy.exe") main.go
+    & "go" build -ldflags="-s -w" -o (Join-Path $binDir "seppy.exe") main.go
     Copy-Item -Path (Join-Path $binDir "seppy.exe") -Destination (Join-Path $binDir "setup.exe") -Force
     Pop-Location
     Write-Host "  [OK] Binary compiled and installed to $binDir" -ForegroundColor Green
