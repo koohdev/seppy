@@ -481,6 +481,7 @@ type model struct {
 	selectedAgentSkills  map[int]bool
 	allSpeckitSkills     []string
 	customCmdMap         map[string]string
+	customNpmCmdMap      map[string]string
 
 	availableDocs        []string
 	selectedDocs         map[int]bool
@@ -673,7 +674,16 @@ func initialModel() model {
 	}
 
 	var skills []string
-	skills = append(skills, userCfg.CustomNpmPackages...)
+	customNpmCmdMap := make(map[string]string)
+	for _, pkg := range userCfg.CustomNpmPackages {
+		cleanPkg := sanitizeString(pkg)
+		displayName := extractNpmDisplayName(cleanPkg)
+		if displayName == "" {
+			displayName = cleanPkg
+		}
+		skills = append(skills, displayName)
+		customNpmCmdMap[displayName] = cleanPkg
+	}
 
 	s1 := spinner.New()
 	s1.Spinner = spinner.Spinner{
@@ -723,6 +733,7 @@ func initialModel() model {
 		availableAgentSkills: agentSkills,
 		selectedAgentSkills:  make(map[int]bool),
 		customCmdMap:         customCmdMap,
+		customNpmCmdMap:      customNpmCmdMap,
 		availableDocs:        docsFiles,
 		selectedDocs:         make(map[int]bool),
 		userDocsPathMap:      userDocsPathMap,
@@ -1089,8 +1100,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						playConfirmSound()
 					}
 				} else {
-					trimmed := strings.TrimSpace(m.customNpmInput)
+					trimmed := sanitizeString(m.customNpmInput)
 					if trimmed != "" {
+						displayName := extractNpmDisplayName(trimmed)
+						if displayName == "" {
+							displayName = trimmed
+						}
+
 						alreadyAdded := false
 						for _, pkg := range m.customNpmPackages {
 							if strings.EqualFold(pkg, trimmed) {
@@ -1101,7 +1117,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if !alreadyAdded {
 							m.customNpmPackages = append(m.customNpmPackages, trimmed)
 							offset := len(m.availableSkills)
-							m.availableSkills = append(m.availableSkills, trimmed)
+							m.availableSkills = append(m.availableSkills, displayName)
+							m.customNpmCmdMap[displayName] = trimmed
 							m.selectedSkills[offset] = true
 
 							m.config.CustomNpmPackages = append(m.config.CustomNpmPackages, trimmed)
@@ -1307,7 +1324,12 @@ func (m model) runStepInstallDeps() tea.Cmd {
 					cmd.Run()
 
 				default:
-					fields := strings.Fields(s)
+					rawCmd, hasCustom := m.customNpmCmdMap[s]
+					if !hasCustom {
+						rawCmd = s
+					}
+					
+					fields := strings.Fields(rawCmd)
 					if len(fields) == 1 {
 						cmd = exec.CommandContext(ctx, "npm", "install", fields[0], "--no-audit", "--no-fund")
 					} else {
@@ -1405,6 +1427,27 @@ func extractSkillName(raw string) string {
 		return raw[:30]
 	}
 	return raw
+}
+
+func extractNpmDisplayName(raw string) string {
+	raw = sanitizeString(raw)
+	if raw == "" {
+		return ""
+	}
+	raw = strings.TrimPrefix(raw, "npm install")
+	raw = strings.TrimPrefix(raw, "npm i")
+	raw = strings.TrimPrefix(raw, "yarn add")
+	raw = strings.TrimPrefix(raw, "pnpm add")
+	raw = strings.TrimPrefix(raw, "pnpm install")
+	raw = strings.TrimPrefix(raw, "bun add")
+	raw = strings.TrimPrefix(raw, "bun install")
+	raw = strings.TrimSpace(raw)
+
+	fields := strings.Fields(raw)
+	if len(fields) > 0 {
+		return fields[0]
+	}
+	return ""
 }
 
 func sanitizeSlug(s string) string {
