@@ -675,14 +675,14 @@ func initialModel() model {
 
 	var skills []string
 	customNpmCmdMap := make(map[string]string)
-	for _, pkg := range userCfg.CustomNpmPackages {
-		cleanPkg := sanitizeString(pkg)
-		displayName := extractNpmDisplayName(cleanPkg)
-		if displayName == "" {
-			displayName = cleanPkg
+	for _, raw := range userCfg.CustomNpmPackages {
+		clean := sanitizeString(raw)
+		if clean == "" {
+			continue
 		}
+		displayName := extractNpmDisplayName(clean)
 		skills = append(skills, displayName)
-		customNpmCmdMap[displayName] = cleanPkg
+		customNpmCmdMap[displayName] = clean
 	}
 
 	s1 := spinner.New()
@@ -1103,13 +1103,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					trimmed := sanitizeString(m.customNpmInput)
 					if trimmed != "" {
 						displayName := extractNpmDisplayName(trimmed)
-						if displayName == "" {
-							displayName = trimmed
-						}
-
 						alreadyAdded := false
-						for _, pkg := range m.customNpmPackages {
-							if strings.EqualFold(pkg, trimmed) {
+						for _, pkg := range m.availableSkills {
+							if strings.EqualFold(pkg, displayName) {
 								alreadyAdded = true
 								break
 							}
@@ -1324,9 +1320,9 @@ func (m model) runStepInstallDeps() tea.Cmd {
 					cmd.Run()
 
 				default:
-					rawCmd, hasCustom := m.customNpmCmdMap[s]
-					if !hasCustom {
-						rawCmd = s
+					rawCmd := s
+					if mappedCmd, ok := m.customNpmCmdMap[s]; ok {
+						rawCmd = mappedCmd
 					}
 					
 					fields := strings.Fields(rawCmd)
@@ -1442,12 +1438,12 @@ func extractNpmDisplayName(raw string) string {
 	raw = strings.TrimPrefix(raw, "bun add")
 	raw = strings.TrimPrefix(raw, "bun install")
 	raw = strings.TrimSpace(raw)
-
+	
 	fields := strings.Fields(raw)
 	if len(fields) > 0 {
 		return fields[0]
 	}
-	return ""
+	return raw
 }
 
 func sanitizeSlug(s string) string {
