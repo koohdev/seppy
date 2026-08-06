@@ -432,6 +432,7 @@ const (
 	stateAgentSkills
 	stateDocs
 	stateLocations
+	stateConfirm
 	stateExec
 	stateDone
 )
@@ -963,6 +964,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateAgentSkills
 				m.cursor = 0
 				playNavSound()
+				return m, nil
+			case stateConfirm:
+				m.state = stateDocs
+				m.cursor = 0
+				playNavSound()
+				return m, nil
 			}
 		}
 
@@ -1168,11 +1175,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.handleMenuNavigation(msg, m.availableAgentSkills, m.selectedAgentSkills, stateDocs)
 
 		case stateDocs:
-			m.handleMenuNavigation(msg, m.availableDocs, m.selectedDocs, stateExec)
-			if m.state == stateExec {
+			m.handleMenuNavigation(msg, m.availableDocs, m.selectedDocs, stateConfirm)
+			
+		case stateConfirm:
+			switch msg.String() {
+			case "enter", "y", "Y":
+				m.state = stateExec
 				m.stepStatus[execCreateApp] = "running"
 				playConfirmSound()
 				return m, m.runStepCreateApp()
+			case "esc":
+				m.state = stateDocs
+				m.cursor = 0
+				playNavSound()
+				return m, nil
 			}
 
 		case stateDone:
@@ -1579,7 +1595,7 @@ func (m model) View() string {
 		b.WriteString(indent + infoStyle.Render("and architectural markdown helpers.") + "\n\n")
 	}
 
-	if m.state != stateBoot && m.state != stateExec && m.state != stateDone && m.state != stateLocations {
+	if m.state != stateBoot && m.state != stateExec && m.state != stateDone && m.state != stateLocations && m.state != stateConfirm {
 		b.WriteString(indent + m.renderStepBar() + nl2)
 	}
 
@@ -1671,6 +1687,23 @@ func (m model) View() string {
 
 	case stateDocs:
 		m.renderMenu(&b, "SELECT MARKDOWN HELPER DOCS (docs/*.md)", m.availableDocs, m.selectedDocs)
+
+	case stateConfirm:
+		b.WriteString(indent + titleStyle.Render("CONFIRM SETUP") + "\n")
+		b.WriteString(indent + instructionStyle.Render("Review your project settings before continuing:") + nl2)
+		b.WriteString(indent + activeItemStyle.Render("Project Name: ") + inactiveItemStyle.Render(m.appName) + "\n")
+		b.WriteString(indent + activeItemStyle.Render("Target Dir:   ") + inactiveItemStyle.Render(m.targetDir) + "\n\n")
+
+		npmCount := countSelected(m.selectedSkills)
+		agentCount := countSelected(m.selectedAgentSkills)
+		docCount := countSelected(m.selectedDocs)
+
+		b.WriteString(indent + activeItemStyle.Render("NPM Packages:  ") + inactiveItemStyle.Render(fmt.Sprintf("%d selected", npmCount)) + "\n")
+		b.WriteString(indent + activeItemStyle.Render("Agent Skills:  ") + inactiveItemStyle.Render(fmt.Sprintf("%d selected", agentCount)) + "\n")
+		b.WriteString(indent + activeItemStyle.Render("Markdown Docs: ") + inactiveItemStyle.Render(fmt.Sprintf("%d selected", docCount)) + "\n\n")
+
+		b.WriteString(indent + instructionStyle.Render("Press [Enter] or [Y] to start execution.") + "\n")
+		b.WriteString(indent + instructionStyle.Render("Press [ESC] to go back and edit.") + "\n")
 
 	case stateExec, stateDone:
 		b.WriteString(indent + titleStyle.Render("EXECUTING SETUP") + "\n")
