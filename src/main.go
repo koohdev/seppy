@@ -36,7 +36,7 @@ type CustomSkillCommand struct {
 type UserConfig struct {
 	DefaultUnselectAll   bool                 `json:"default_unselect_all"`
 	CustomSkillsCommands []CustomSkillCommand `json:"custom_skills_commands"`
-	CustomNpmPackages    []string             `json:"custom_npm_packages"`
+	CustomNpmPackages    []CustomSkillCommand `json:"custom_npm_packages"`
 }
 
 // Windows API DLLs & Procedures
@@ -502,7 +502,9 @@ type model struct {
 	customSkillItems     []string
 	customSkillCmds      []string
 	customDocPaths       []string
-	customNpmPackages    []string
+	customNpmPackages    []CustomSkillCommand
+	customNpmInputMode   int
+	customNpmTempCmd     string
 
 	// Viewport component for 100% full tab scrolling
 	viewport             viewport.Model
@@ -591,7 +593,7 @@ func defaultUserConfig() UserConfig {
 	return UserConfig{
 		DefaultUnselectAll:   false,
 		CustomSkillsCommands: []CustomSkillCommand{},
-		CustomNpmPackages:    []string{},
+		CustomNpmPackages:    []CustomSkillCommand{},
 	}
 }
 
@@ -676,14 +678,14 @@ func initialModel() model {
 
 	var skills []string
 	customNpmCmdMap := make(map[string]string)
-	for _, raw := range userCfg.CustomNpmPackages {
-		clean := sanitizeString(raw)
-		if clean == "" {
+	for _, pkg := range userCfg.CustomNpmPackages {
+		cleanCmd := sanitizeString(pkg.Command)
+		cleanName := sanitizeString(pkg.Name)
+		if cleanCmd == "" || cleanName == "" {
 			continue
 		}
-		displayName := extractNpmDisplayName(clean)
-		skills = append(skills, displayName)
-		customNpmCmdMap[displayName] = clean
+		skills = append(skills, cleanName)
+		customNpmCmdMap[cleanName] = cleanCmd
 	}
 
 	s1 := spinner.New()
@@ -1044,6 +1046,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.viewport.GotoBottom()
 				}
+				m.customNpmInputMode = 0
+				m.customNpmTempCmd = ""
+				m.customNpmInput = ""
 				m = updateCustomViewportContent(m)
 				playToggleSound()
 
@@ -1109,28 +1114,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					trimmed := sanitizeString(m.customNpmInput)
 					if trimmed != "" {
-						displayName := extractNpmDisplayName(trimmed)
-						alreadyAdded := false
-						for _, pkg := range m.availableSkills {
-							if strings.EqualFold(pkg, displayName) {
-								alreadyAdded = true
-								break
+						if m.customNpmInputMode == 0 {
+							m.customNpmTempCmd = trimmed
+							m.customNpmInput = ""
+							m.customNpmInputMode = 1
+							m = updateCustomViewportContent(m)
+							playToggleSound()
+						} else {
+							displayName := trimmed
+							alreadyAdded := false
+							for _, pkg := range m.availableSkills {
+								if strings.EqualFold(pkg, displayName) {
+									alreadyAdded = true
+									break
+								}
 							}
-						}
-						if !alreadyAdded {
-							m.customNpmPackages = append(m.customNpmPackages, trimmed)
-							offset := len(m.availableSkills)
-							m.availableSkills = append(m.availableSkills, displayName)
-							m.customNpmCmdMap[displayName] = trimmed
-							m.selectedSkills[offset] = true
+							if !alreadyAdded {
+								newPkg := CustomSkillCommand{Name: displayName, Command: m.customNpmTempCmd}
+								m.customNpmPackages = append(m.customNpmPackages, newPkg)
+								offset := len(m.availableSkills)
+								m.availableSkills = append(m.availableSkills, displayName)
+								m.customNpmCmdMap[displayName] = m.customNpmTempCmd
+								m.selectedSkills[offset] = true
 
-							m.config.CustomNpmPackages = append(m.config.CustomNpmPackages, trimmed)
-							saveUserConfig(m.configPath, m.config)
+								m.config.CustomNpmPackages = append(m.config.CustomNpmPackages, newPkg)
+								saveUserConfig(m.configPath, m.config)
+							}
+							m.customNpmInput = ""
+							m.customNpmTempCmd = ""
+							m.customNpmInputMode = 0
+							m = updateCustomViewportContent(m)
+							playToggleSound()
 						}
-						m.customNpmInput = ""
-						m = updateCustomViewportContent(m)
-						playToggleSound()
-					} else if strings.TrimSpace(m.customSkillInput) == "" && strings.TrimSpace(m.customDocInput) == "" {
+					} else if strings.TrimSpace(m.customSkillInput) == "" && strings.TrimSpace(m.customDocInput) == "" && m.customNpmInputMode == 0 {
 						m.state = stateSkills
 						m.cursor = 0
 						playConfirmSound()
@@ -1550,21 +1566,23 @@ func updateCustomViewportContent(m model) model {
 	tabContent.WriteString("\n")
 
 	if m.customActiveField == 2 {
-		tabContent.WriteString(indent + activeItemStyle.Render("[+] Custom NPM Package Name") + "\n")
-		tabContent.WriteString(indent + instructionStyle.Render("    e.g. framer-motion") + "\n")
-		tabContent.WriteString(indent + "    " + m.spinner.View() + " " + activeItemStyle.Render(m.customNpmInput) + "█\n")
+		if m.customNpmInputMode == 0 {
+			tabContent.WriteString(indent + activeItemStyle.Render("[+] Custom NPM Package (Command)") + "\n")
+			tabContent.WriteString(indent + instructionStyle.Render("    e.g. npm install framer-motion") + "\n")
+			tabContent.WriteString(indent + "    " + m.spinner.View() + " " + activeItemStyle.Render(m.customNpmInput) + "█\n")
+		} else {
+			tabContent.WriteString(indent + activeItemStyle.Render("[+] Custom NPM Package (Display Name)") + "\n")
+			tabContent.WriteString(indent + instructionStyle.Render("    e.g. framer-motion") + "\n")
+			tabContent.WriteString(indent + "    " + m.spinner.View() + " " + activeItemStyle.Render(m.customNpmInput) + "█\n")
+		}
 	} else {
 		tabContent.WriteString(indent + uncheckStyle.Render("[ ] Custom NPM Package Name") + "\n")
-		tabContent.WriteString(indent + instructionStyle.Render("    e.g. framer-motion") + "\n")
+		tabContent.WriteString(indent + instructionStyle.Render("    Press [Tab] to add a custom NPM package") + "\n")
 		tabContent.WriteString(indent + "    " + "  " + inactiveItemStyle.Render(m.customNpmInput) + "\n")
 	}
 	if len(m.customNpmPackages) > 0 {
 		for _, pkg := range m.customNpmPackages {
-			disp := extractNpmDisplayName(pkg)
-			if disp == "" {
-				disp = pkg
-			}
-			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(disp) + "\n")
+			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(pkg.Name) + "\n")
 		}
 	}
 
