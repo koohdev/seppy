@@ -271,10 +271,19 @@ func getCatComment(m model) string {
 	case stateAppName:
 		currentAppName := strings.TrimSpace(m.textInput)
 		if currentAppName == "" {
-			currentAppName = m.appName
+			if m.collisionCount > 0 {
+				targetDir := filepath.Join(m.parentDir, m.appName)
+				if dirExists(targetDir) {
+					if m.collisionCount >= 3 {
+						return fmt.Sprintf("Seriously? '%s' is STILL taken. Read the room!", m.appName)
+					}
+					return fmt.Sprintf("'%s' exists! Pick a new name or I'll knock it off!", m.appName)
+				}
+			}
+			return "Name this app? Make it pawsome!"
 		}
+		
 		targetDir := filepath.Join(m.parentDir, currentAppName)
-
 		if dirExists(targetDir) {
 			if m.collisionCount >= 3 {
 				return fmt.Sprintf("Seriously? '%s' is STILL taken. Read the room!", currentAppName)
@@ -282,9 +291,6 @@ func getCatComment(m model) string {
 				return fmt.Sprintf("'%s' exists! Pick a new name or I'll knock it off!", currentAppName)
 			}
 			return fmt.Sprintf("Hmm... '%s' smells like it already exists.", currentAppName)
-		}
-		if currentAppName == "my-awesome-app" {
-			return "Name this app? Make it pawsome!"
 		}
 		return fmt.Sprintf("'%s'? Purr-fect choice!", currentAppName)
 
