@@ -35,22 +35,7 @@ if (Test-Path (Join-Path $srcDir "main.go")) {
     Write-Host "  [!] Error: src/main.go not found." -ForegroundColor Red
 }
 
-# 3. Reflect local skills & docs into ~/.seppy
-$templateDir = Join-Path $scriptDir "template"
-if (Test-Path $templateDir) {
-    $localSkills = Join-Path $templateDir ".agents\skills"
-    if (Test-Path $localSkills) {
-        Copy-Item -Path "$localSkills\*" -Destination $cacheDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "  [OK] Synced local skills to $cacheDir" -ForegroundColor Green
-    }
-    $localDocs = Join-Path $templateDir "docs"
-    if (Test-Path $localDocs) {
-        Copy-Item -Path "$localDocs\*" -Destination $docsDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "  [OK] Synced local markdown docs to $docsDir" -ForegroundColor Green
-    }
-}
-
-# 4. Create default config.json if missing
+# 3. Create default config.json if missing
 if (!(Test-Path $configFile)) {
     $defaultConfig = @'
 {
