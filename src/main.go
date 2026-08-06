@@ -575,7 +575,7 @@ func saveUserConfig(configFile string, cfg UserConfig) {
 
 func defaultUserConfig() UserConfig {
 	return UserConfig{
-		DefaultUnselectAll:   true,
+		DefaultUnselectAll:   false,
 		CustomSkillsCommands: []CustomSkillCommand{},
 		CustomNpmPackages:    []string{},
 	}
