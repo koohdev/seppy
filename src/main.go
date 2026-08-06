@@ -1551,16 +1551,20 @@ func updateCustomViewportContent(m model) model {
 
 	if m.customActiveField == 2 {
 		tabContent.WriteString(indent + activeItemStyle.Render("[+] Custom NPM Package Name") + "\n")
-		tabContent.WriteString(indent + instructionStyle.Render("    e.g. npm install framer-motion") + "\n")
+		tabContent.WriteString(indent + instructionStyle.Render("    e.g. framer-motion") + "\n")
 		tabContent.WriteString(indent + "    " + m.spinner.View() + " " + activeItemStyle.Render(m.customNpmInput) + "█\n")
 	} else {
 		tabContent.WriteString(indent + uncheckStyle.Render("[ ] Custom NPM Package Name") + "\n")
-		tabContent.WriteString(indent + instructionStyle.Render("    e.g. npm install framer-motion") + "\n")
+		tabContent.WriteString(indent + instructionStyle.Render("    e.g. framer-motion") + "\n")
 		tabContent.WriteString(indent + "    " + "  " + inactiveItemStyle.Render(m.customNpmInput) + "\n")
 	}
 	if len(m.customNpmPackages) > 0 {
 		for _, pkg := range m.customNpmPackages {
-			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(pkg) + "\n")
+			disp := extractNpmDisplayName(pkg)
+			if disp == "" {
+				disp = pkg
+			}
+			tabContent.WriteString(indent + "      " + successStyle.Render("✓ ") + inactiveItemStyle.Render(disp) + "\n")
 		}
 	}
 
