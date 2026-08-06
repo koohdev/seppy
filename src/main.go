@@ -1089,7 +1089,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						playConfirmSound()
 					}
 				} else {
-					trimmed := extractNpmPackageName(m.customNpmInput)
+					trimmed := strings.TrimSpace(m.customNpmInput)
 					if trimmed != "" {
 						alreadyAdded := false
 						for _, pkg := range m.customNpmPackages {
@@ -1307,8 +1307,12 @@ func (m model) runStepInstallDeps() tea.Cmd {
 					cmd.Run()
 
 				default:
-					pkgName := strings.Fields(s)[0]
-					cmd = exec.CommandContext(ctx, "npm", "install", pkgName, "--no-audit", "--no-fund")
+					fields := strings.Fields(s)
+					if len(fields) == 1 {
+						cmd = exec.CommandContext(ctx, "npm", "install", fields[0], "--no-audit", "--no-fund")
+					} else {
+						cmd = exec.CommandContext(ctx, fields[0], fields[1:]...)
+					}
 					cmd.Run()
 				}
 				cancel()
@@ -1401,18 +1405,6 @@ func extractSkillName(raw string) string {
 		return raw[:30]
 	}
 	return raw
-}
-
-func extractNpmPackageName(raw string) string {
-	raw = sanitizeString(raw)
-	if raw == "" {
-		return ""
-	}
-	raw = strings.TrimPrefix(raw, "npm install")
-	raw = strings.TrimPrefix(raw, "npm i")
-	raw = strings.TrimPrefix(raw, "pnpm add")
-	raw = strings.TrimPrefix(raw, "yarn add")
-	return strings.TrimSpace(raw)
 }
 
 func sanitizeSlug(s string) string {
