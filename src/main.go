@@ -276,7 +276,12 @@ func getCatComment(m model) string {
 		targetDir := filepath.Join(m.parentDir, currentAppName)
 
 		if dirExists(targetDir) {
-			return fmt.Sprintf("'%s' exists! Pick a new name or I'll knock it off!", currentAppName)
+			if m.collisionCount >= 3 {
+				return fmt.Sprintf("Seriously? '%s' is STILL taken. Read the room!", currentAppName)
+			} else if m.collisionCount >= 1 {
+				return fmt.Sprintf("'%s' exists! Pick a new name or I'll knock it off!", currentAppName)
+			}
+			return fmt.Sprintf("Hmm... '%s' smells like it already exists.", currentAppName)
 		}
 		if currentAppName == "my-awesome-app" {
 			return "Name this app? Make it pawsome!"
@@ -461,6 +466,7 @@ type model struct {
 	catCommentTick       int
 	lastCatComment       string
 	idleTicks            int
+	collisionCount       int
 
 	availableSkills      []string
 	selectedSkills       map[int]bool
@@ -979,6 +985,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.targetDir = filepath.Join(m.parentDir, m.appName)
 					if dirExists(m.targetDir) {
+						m.idleTicks = 0
+						m.catCommentTick = 0
+						m.collisionCount++
 						playToggleSound()
 						return m, nil
 					}
@@ -986,10 +995,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 					playConfirmSound()
 				case tea.KeyBackspace, tea.KeyDelete:
+					m.collisionCount = 0
 					if len(m.textInput) > 0 {
 						m.textInput = m.textInput[:len(m.textInput)-1]
 					}
 				case tea.KeyRunes:
+					m.collisionCount = 0
 					m.textInput += string(msg.Runes)
 				}
 			}
@@ -1599,10 +1610,6 @@ func (m model) View() string {
 			currentAppName := strings.TrimSpace(m.textInput)
 			if currentAppName == "" {
 				currentAppName = m.appName
-			}
-			targetDir := filepath.Join(m.parentDir, currentAppName)
-			if dirExists(targetDir) {
-				b.WriteString(indent + errorStyle.Render("[!] Folder '"+currentAppName+"' already exists in output directory!") + "\n")
 			}
 		}
 
